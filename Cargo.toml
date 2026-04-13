@@ -5,13 +5,13 @@ edition = "2021"
 
 [dependencies]
 
-# Async runtime — the heart of the pipeline
-tokio  = { version = "1", features = ["full"] }
+# Async runtime
+tokio = { version = "1", features = ["full"] }
 
 # MQTT client (async)
 rumqttc = "0.24"
 
-# JSON serialization — abstracted behind a trait so we can swap to binary later
+# Serialization — JSON now, binary-ready later
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -25,8 +25,8 @@ chrono = { version = "0.4", features = ["serde"] }
 # Unique message IDs
 uuid = { version = "1", features = ["v4", "serde"] }
 
-# Week 2: binary serialization (postcard — no-std compatible, used in embedded/robotics)
-# postcard = { version = "1", features = ["alloc"] }   ← uncomment in week 2
+# Binary serialization (uncomment when ready)
+# postcard = { version = "1", features = ["alloc"] }
 
-# Week 2: Kafka producer
-# rdkafka = { version = "0.36", features = ["cmake-build"] }  ← uncomment in week 2
+# Kafka producer — cmake-build compiles librdkafka from source
+rdkafka = { version = "0.36", features = ["cmake-build"] }

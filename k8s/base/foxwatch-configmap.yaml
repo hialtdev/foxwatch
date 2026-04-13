@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foxwatch-config
+data:
+  MQTT_HOST:         "10.99.1.199"
+  MQTT_PORT:         "1883"
+  MQTT_TOPIC:        "homeassistant/#"
+  MQTT_CLIENT_ID:    "foxwatch"
+  KAFKA_BOOTSTRAP:   "bitbybit-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+  KAFKA_TOPIC:       "foxwatch-telemetry"
+  RUST_LOG:          "info"

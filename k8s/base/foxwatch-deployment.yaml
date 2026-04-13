@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foxwatch
+  labels:
+    app: foxwatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foxwatch
+  template:
+    metadata:
+      labels:
+        app: foxwatch
+    spec:
+      containers:
+        - name: foxwatch
+          image: foxwatch:latest
+          imagePullPolicy: Never        # image is built locally on the node
+          envFrom:
+            - configMapRef:
+                name: foxwatch-config   # all env vars from the ConfigMap
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          # Liveness: if this fails k8s restarts the pod
+          # We'll add a real HTTP health endpoint soon —
+          # for now we just check the process is alive
+          livenessProbe:
+            exec:
+              command: ["pgrep", "foxwatch"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
