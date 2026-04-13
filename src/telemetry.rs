@@ -12,12 +12,12 @@ use uuid::Uuid;
 // Clone: lets callers duplicate a message if needed (e.g. fan-out to Kafka + Seq)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryMessage {
-    pub id:          Uuid,
-    pub topic:       String,
-    pub device_id:   String,
-    pub state:       DeviceState,
-    pub timestamp:   DateTime<Utc>,
-    pub raw_payload: String,  // preserve original for audit / replay
+    pub id: Uuid,
+    pub topic: String,
+    pub device_id: String,
+    pub state: DeviceState,
+    pub timestamp: DateTime<Utc>,
+    pub raw_payload: String, // preserve original for audit / replay
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ pub enum DeviceState {
     On,
     Off,
     Unavailable,
-    Unknown(String),  // captures any new state HA adds — forward-compatible
+    Unknown(String), // captures any new state HA adds — forward-compatible
 }
 
 // ValidationError is a simple enum — no exceptions in Rust.
@@ -40,8 +40,8 @@ pub enum ValidationError {
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValidationError::EmptyTopic      => write!(f, "topic is empty"),
-            ValidationError::EmptyDeviceId   => write!(f, "device_id is empty"),
+            ValidationError::EmptyTopic => write!(f, "topic is empty"),
+            ValidationError::EmptyDeviceId => write!(f, "device_id is empty"),
             ValidationError::FutureTimestamp => write!(f, "timestamp is in the future"),
         }
     }

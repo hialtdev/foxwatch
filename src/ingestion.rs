@@ -2,8 +2,8 @@
 // Receives owned data from main's event loop.
 // Parses, validates, and logs. Week 2 adds Kafka publish here.
 
-use log::{info, warn, error};
-use crate::telemetry::{TelemetryMessage, DeviceState};
+use crate::telemetry::{DeviceState, TelemetryMessage};
+use log::{error, info, warn};
 
 // Takes ownership of topic (String) and payload (Vec<u8>).
 // Called from tokio::spawn — must own its data, not borrow it,
@@ -11,7 +11,7 @@ use crate::telemetry::{TelemetryMessage, DeviceState};
 pub async fn process_payload(topic: String, payload: Vec<u8>) {
     // Parse raw bytes to UTF-8. &payload borrows — no copy needed.
     let raw = match std::str::from_utf8(&payload) {
-        Ok(s)  => s.to_string(),
+        Ok(s) => s.to_string(),
         Err(e) => {
             error!("Non-UTF8 payload on {topic}: {e}");
             return;
@@ -31,7 +31,7 @@ pub async fn process_payload(topic: String, payload: Vec<u8>) {
         Ok(()) => {
             info!(
                 "✓ [{id}] {topic} → {state:?}",
-                id    = &message.id.to_string()[..8],  // short ID for readability
+                id = &message.id.to_string()[..8], // short ID for readability
                 topic = message.topic,
                 state = message.state,
             );
@@ -60,16 +60,16 @@ fn extract_device_id(topic: &str) -> Option<String> {
 fn parse_ha_state(raw: &str) -> DeviceState {
     // Try simple string match first
     match raw.trim() {
-        "ON"          => return DeviceState::On,
-        "OFF"         => return DeviceState::Off,
+        "ON" => return DeviceState::On,
+        "OFF" => return DeviceState::Off,
         "unavailable" => return DeviceState::Unavailable,
-        _             => {}
+        _ => {}
     }
     // Try JSON — HA sometimes sends {"state":"ON",...}
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
         if let Some(s) = v.get("state").and_then(|s| s.as_str()) {
             return match s {
-                "ON"  => DeviceState::On,
+                "ON" => DeviceState::On,
                 "OFF" => DeviceState::Off,
                 other => DeviceState::Unknown(other.to_string()),
             };

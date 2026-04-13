@@ -2,12 +2,12 @@
 // Ownership philosophy: MQTT payloads are cloned once on receipt, then
 // ownership is moved into the processor. No shared mutable state.
 
-mod telemetry;
 mod ingestion;
+mod telemetry;
 
+use log::{error, info, warn};
+use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
-use rumqttc::{AsyncClient, MqttOptions, QoS, Event, Packet};
-use log::{info, warn, error};
 
 // #[tokio::main] transforms async fn main() into a Tokio runtime.
 // This is the async equivalent of Spring Boot's application context startup.
@@ -47,7 +47,7 @@ async fn main() {
     loop {
         match eventloop.poll().await {
             Ok(Event::Incoming(Packet::Publish(publish))) => {
-                let topic   = publish.topic.clone();    // String — cheap clone
+                let topic = publish.topic.clone(); // String — cheap clone
                 let payload = publish.payload.to_vec(); // owned Vec<u8>
 
                 // tokio::spawn moves ownership into an async task.
@@ -59,7 +59,7 @@ async fn main() {
                     ingestion::process_payload(topic, payload).await;
                 });
             }
-            Ok(_) => {}  // ConnAck, SubAck, PingResp, etc — ignore for now
+            Ok(_) => {} // ConnAck, SubAck, PingResp, etc — ignore for now
             Err(e) => {
                 error!("MQTT connection error: {e}");
                 tokio::time::sleep(Duration::from_secs(5)).await;
