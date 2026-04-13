@@ -5,7 +5,7 @@
 mod ingestion;
 mod telemetry;
 
-use log::{error, info, warn};
+use log::{error, info};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
 

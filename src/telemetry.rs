@@ -80,6 +80,7 @@ impl TelemetryMessage {
 
     // Abstracted serialization — today JSON, tomorrow bincode/postcard.
     // Swapping the body here is the only change needed for binary formats.
+    #[allow(dead_code)]
     pub fn serialize(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec(self)
     }
