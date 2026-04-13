@@ -1,0 +1,45 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Test · Build · Docker (production)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # Full quality gate on main — fmt + clippy + release tests
+      - name: Check formatting (rustfmt)
+        run: cargo fmt --all -- --check
+
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Release mode tests catch optimisation-specific behaviour
+      - name: Test (release mode)
+        run: cargo test --release --verbose
+
+      - name: Build Docker image (production)
+        run: docker build -t foxwatch:latest .
+
+      # Uncomment when you have a registry (Docker Hub, GHCR, etc.)
+      # - name: Push to registry
+      #   run: |
+      #     echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ghcr.io -u hialtdev --password-stdin
+      #     docker tag foxwatch:latest ghcr.io/hialtdev/foxwatch:latest
+      #     docker push ghcr.io/hialtdev/foxwatch:latest

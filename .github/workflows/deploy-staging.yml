@@ -1,17 +1,15 @@
-name: Rust CI
+name: Staging Deploy
 
 on:
   push:
-    branches: [ "**" ]  # all branches
-  pull_request:
-    branches: [ main, staging ]
+    branches: [ staging ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Format · Lint · Test
+  build:
+    name: Test · Build · Docker (staging)
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +20,6 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      # Caches ~/.cargo/registry and target/ — cuts run time from ~3min to ~30sec
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
@@ -32,8 +29,8 @@ jobs:
       - name: Lint (clippy)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Build
-        run: cargo build --verbose
-
       - name: Test
         run: cargo test --verbose
+
+      - name: Build Docker image (staging)
+        run: docker build -t foxwatch:staging .
