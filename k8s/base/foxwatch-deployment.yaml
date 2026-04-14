@@ -17,7 +17,7 @@ spec:
       containers:
         - name: foxwatch
           image: foxwatch:latest
-          imagePullPolicy: Never        # image is built locally on the node
+          imagePullPolicy: Always        # image is built locally on the node
           envFrom:
             - configMapRef:
                 name: foxwatch-config   # all env vars from the ConfigMap
