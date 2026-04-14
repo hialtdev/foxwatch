@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make gcc g++ libssl-dev libcurl4-openssl-dev pkg-config
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -23,21 +28,19 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
-      # Full quality gate on main — fmt + clippy + release tests
       - name: Check formatting (rustfmt)
         run: cargo fmt --all -- --check
 
       - name: Lint (clippy)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      # Release mode tests catch optimisation-specific behaviour
       - name: Test (release mode)
         run: cargo test --release --verbose
 
       - name: Build Docker image (production)
         run: docker build -t foxwatch:latest .
 
-      # Uncomment when you have a registry (Docker Hub, GHCR, etc.)
+      # Uncomment when registry is configured
       # - name: Push to registry
       #   run: |
       #     echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ghcr.io -u hialtdev --password-stdin
