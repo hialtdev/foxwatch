@@ -44,7 +44,7 @@ async fn main() {
     match client.subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce).await {
         Ok(_) => {
             info!("Subscribed to {} — waiting for telemetry", cfg.mqtt_topic);
-        },
+        }
         Err(e) => {
             error!("Initial subscription failed: {e}");
         }

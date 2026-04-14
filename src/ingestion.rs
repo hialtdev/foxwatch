@@ -48,26 +48,19 @@ pub async fn process_payload(
     }
 }
 
-
 pub fn extract_device_id(topic: &str) -> Option<String> {
     // .filter(|s| !s.is_empty()) handles leading/trailing/double slashes
-    let parts: Vec<&str> = topic.split('/')
-        .filter(|s| !s.is_empty())
-        .collect();
+    let parts: Vec<&str> = topic.split('/').filter(|s| !s.is_empty()).collect();
 
     match parts.as_slice() {
         // Case 1: The "Deep" or "Standard" HA topic
         // Pattern: [prefix, type, id, ...everything else]
         // Example: "homeassistant/binary_sensor/motion_sensor/state" -> "motion_sensor"
-        [prefix, _type, id, ..] if *prefix == "homeassistant" => {
-            Some(id.to_string())
-        }
+        [prefix, _type, id, ..] if *prefix == "homeassistant" => Some(id.to_string()),
 
         // Case 2: The "Short" topic
         // Example: "homeassistant/status" -> "status"
-        [prefix, id] if *prefix == "homeassistant" => {
-            Some(id.to_string())
-        }
+        [prefix, id] if *prefix == "homeassistant" => Some(id.to_string()),
 
         _ => None,
     }
