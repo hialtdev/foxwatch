@@ -1,15 +1,12 @@
-// src/main.rs — foxwatch entry point
+// src/main.rs
 
-mod config;
-mod ingestion;
-mod kafka_producer;
-mod seq_logger;
-mod telemetry;
+use foxwatch::config;
+use foxwatch::ingestion;
+use foxwatch::kafka_producer::KafkaProducer;
+use foxwatch::seq_logger::SeqLogger;
 
-use kafka_producer::KafkaProducer;
 use log::{error, info};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
-use seq_logger::SeqLogger;
 use std::time::Duration;
 
 #[tokio::main]
@@ -33,21 +30,25 @@ async fn main() {
     let producer = KafkaProducer::new(&cfg.kafka_bootstrap, &cfg.kafka_topic);
 
     // ── MQTT setup ───────────────────────────────────────────────────────────
-    let mut mqttoptions = MqttOptions::new(&cfg.client_id, &cfg.mqtt_host, cfg.mqtt_port);
+    // Use the K8s pod hostname to ensure unique client IDs per replica
+    let pod_name = std::env::var("HOSTNAME").unwrap_or_else(|_| "foxwatch-local".to_string());
+    let unique_client_id = format!("{}-{}", cfg.client_id, pod_name);
+
+    let mut mqttoptions = MqttOptions::new(unique_client_id, &cfg.mqtt_host, cfg.mqtt_port);
     mqttoptions.set_keep_alive(Duration::from_secs(30));
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
-    client
-        .subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce)
-        .await
-        .expect("Failed to subscribe — is the broker running?");
-
-    info!("Subscribed to {} — waiting for telemetry", cfg.mqtt_topic);
-    seq.info(&format!(
-        "Subscribed to {} — pipeline ready",
-        cfg.mqtt_topic
-    ));
+    // We move the subscribe inside the loop or handle the error gracefully
+    // so that if the connection drops, we don't just crash on .expect()
+    match client.subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce).await {
+        Ok(_) => {
+            info!("Subscribed to {} — waiting for telemetry", cfg.mqtt_topic);
+        },
+        Err(e) => {
+            error!("Initial subscription failed: {e}");
+        }
+    }
 
     // ── Event loop ───────────────────────────────────────────────────────────
     loop {
@@ -65,7 +66,9 @@ async fn main() {
             Ok(_) => {}
             Err(e) => {
                 error!("MQTT connection error: {e}");
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                // Simple backoff: sleep for 10 seconds before retrying
+                tokio::time::sleep(Duration::from_secs(10)).await;
+                continue; // Force the event loop to try again
             }
         }
     }
