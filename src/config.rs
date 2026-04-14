@@ -1,8 +1,4 @@
 // src/config.rs
-// All runtime configuration read from environment variables.
-// Defaults let `cargo run` work locally without any env setup.
-// In k8s, values are injected via ConfigMap.
-
 pub struct Config {
     pub mqtt_host: String,
     pub mqtt_port: u16,
@@ -10,6 +6,7 @@ pub struct Config {
     pub client_id: String,
     pub kafka_bootstrap: String,
     pub kafka_topic: String,
+    pub seq_url: String,
 }
 
 impl Config {
@@ -23,14 +20,15 @@ impl Config {
             mqtt_topic: std::env::var("MQTT_TOPIC")
                 .unwrap_or_else(|_| "homeassistant/#".to_string()),
             client_id: std::env::var("MQTT_CLIENT_ID").unwrap_or_else(|_| "foxwatch".to_string()),
-
-            // Cross-namespace k8s DNS:
-            // <service>.<namespace>.svc.cluster.local
             kafka_bootstrap: std::env::var("KAFKA_BOOTSTRAP").unwrap_or_else(|_| {
                 "bitbybit-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092".to_string()
             }),
             kafka_topic: std::env::var("KAFKA_TOPIC")
                 .unwrap_or_else(|_| "foxwatch-telemetry".to_string()),
+            // Internal k8s DNS — port 5341 is Seq's CLEF ingestion port
+            seq_url: std::env::var("SEQ_URL").unwrap_or_else(|_| {
+                "http://seq-service.default.svc.cluster.local:5341".to_string()
+            }),
         }
     }
 }

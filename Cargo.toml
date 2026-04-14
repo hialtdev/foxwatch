@@ -15,9 +15,15 @@ rumqttc = "0.24"
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Structured logging
-log        = "0.4"
-env_logger = "0.11"
+# Tracing — modern Rust structured logging (replaces log + env_logger)
+# tracing::info!/warn!/error! macros work like log:: but carry structured fields
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Seq HTTP ingestion — ships CLEF (Compact Log Event Format) to Seq port 5341
+# Same wire format your bitbybit log4j2 HTTP appender uses
+tracing-appender   = "0.2"
+reqwest            = { version = "0.12", features = ["json"] }
 
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
@@ -25,8 +31,10 @@ chrono = { version = "0.4", features = ["serde"] }
 # Unique message IDs
 uuid = { version = "1", features = ["v4", "serde"] }
 
+# Kafka producer
+rdkafka = { version = "0.36", features = ["cmake-build"] }
+log = "0.4.29"
+env_logger = "0.11.10"
+
 # Binary serialization (uncomment when ready)
 # postcard = { version = "1", features = ["alloc"] }
-
-# Kafka producer — cmake-build compiles librdkafka from source
-rdkafka = { version = "0.36", features = ["cmake-build"] }
