@@ -10,7 +10,7 @@ fn test_extract_device_id_standard_ha() {
 
 #[test]
 fn test_extract_device_id_short_topic() {
-    let topic = "homeassistant/status";
+    let _topic = "homeassistant/status";
     // This is currently failing in your logs (returning None/unknown)
     // because parts.len() is only 2.
     // assert_eq!(extract_device_id(topic), None);
