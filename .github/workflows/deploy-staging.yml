@@ -1,3 +1,4 @@
+# .github/workflows/staging.yml
 name: Staging Deploy
 
 on:
@@ -6,10 +7,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
   build:
-    name: Test · Build · Docker (staging)
+    name: Test · Build · Deploy (staging)
     runs-on: ubuntu-latest
 
     steps:
@@ -37,5 +40,43 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
-      - name: Build Docker image (staging)
-        run: docker build -t foxwatch:staging .
+      # ── Docker ──────────────────────────────────────────────────────────────
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push
+        run: |
+          SHA_TAG="${{ env.IMAGE }}:${{ github.sha }}"
+          STAGING_TAG="${{ env.IMAGE }}:staging"
+
+          docker build -t "$SHA_TAG" -t "$STAGING_TAG" .
+          docker push "$SHA_TAG"
+          docker push "$STAGING_TAG"
+
+      # ── Deploy ──────────────────────────────────────────────────────────────
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Patch image and roll out
+        run: |
+          SHA_TAG="${{ env.IMAGE }}:${{ github.sha }}"
+
+          # Patching to the SHA tag guarantees K3s sees a new image string
+          # every run — it has never cached this exact tag, so it must pull.
+          kubectl set image deployment/foxwatch \
+            foxwatch="$SHA_TAG" \
+            --namespace staging
+
+          kubectl rollout status deployment/foxwatch \
+            --namespace staging \
+            --timeout=120s
+
+      - name: Smoke-check pod is running
+        run: |
+          kubectl get pods -n staging -l app=foxwatch
+          kubectl logs -n staging deployment/foxwatch --tail=20
