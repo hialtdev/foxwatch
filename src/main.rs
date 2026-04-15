@@ -53,6 +53,13 @@ async fn main() {
     // ── Event loop ───────────────────────────────────────────────────────────
     loop {
         match eventloop.poll().await {
+            Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                // Whenever we get a ConnAck, it means we just connected or re-connected
+                info!("MQTT Connection established/restored — re-subscribing...");
+                if let Err(e) = client.subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce).await {
+                    error!("Re-subscription failed: {e}");
+                }
+            }
             Ok(Event::Incoming(Packet::Publish(publish))) => {
                 let topic = publish.topic.clone();
                 let payload = publish.payload.to_vec();
@@ -66,9 +73,9 @@ async fn main() {
             Ok(_) => {}
             Err(e) => {
                 error!("MQTT connection error: {e}");
-                // Simple backoff: sleep for 10 seconds before retrying
                 tokio::time::sleep(Duration::from_secs(10)).await;
-                continue; // Force the event loop to try again
+                // No need to 'continue' if you rely on eventloop.poll()
+                // to handle the reconnection attempt automatically.
             }
         }
     }
