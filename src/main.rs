@@ -1,5 +1,3 @@
-// src/main.rs
-
 use foxwatch::config;
 use foxwatch::ingestion;
 use foxwatch::kafka_producer::KafkaProducer;
@@ -7,7 +5,9 @@ use foxwatch::seq_logger::SeqLogger;
 
 use log::{error, info};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Semaphore;
 
 #[tokio::main]
 async fn main() {
@@ -20,62 +20,61 @@ async fn main() {
         cfg.mqtt_host, cfg.mqtt_port, cfg.kafka_bootstrap, cfg.seq_url
     );
 
-    // ── Seq structured logger ────────────────────────────────────────────────
-    // Spawns a background task that batches CLEF events to Seq every second.
-    // Clone is cheap — just an mpsc sender clone.
     let seq = SeqLogger::start(cfg.seq_url.clone());
     seq.info("foxwatch started — pipeline initializing");
 
-    // ── Kafka producer ───────────────────────────────────────────────────────
     let producer = KafkaProducer::new(&cfg.kafka_bootstrap, &cfg.kafka_topic);
 
-    // ── MQTT setup ───────────────────────────────────────────────────────────
-    // Use the K8s pod hostname to ensure unique client IDs per replica
     let pod_name = std::env::var("HOSTNAME").unwrap_or_else(|_| "foxwatch-local".to_string());
     let unique_client_id = format!("{}-{}", cfg.client_id, pod_name);
 
     let mut mqttoptions = MqttOptions::new(unique_client_id, &cfg.mqtt_host, cfg.mqtt_port);
     mqttoptions.set_keep_alive(Duration::from_secs(30));
+    mqttoptions.set_clean_session(true);
 
-    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+    // ✅ Increased channel capacity
+    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 100);
 
-    // We move the subscribe inside the loop or handle the error gracefully
-    // so that if the connection drops, we don't just crash on .expect()
-    match client.subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce).await {
-        Ok(_) => {
-            info!("Subscribed to {} — waiting for telemetry", cfg.mqtt_topic);
-        }
-        Err(e) => {
-            error!("Initial subscription failed: {e}");
-        }
-    }
+    // ✅ Concurrency cap for ingestion tasks
+    let semaphore = Arc::new(Semaphore::new(64));
 
-    // ── Event loop ───────────────────────────────────────────────────────────
+    // ✅ No subscribe() call here — wait for ConnAck
+
     loop {
         match eventloop.poll().await {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
-                // Whenever we get a ConnAck, it means we just connected or re-connected
-                info!("MQTT Connection established/restored — re-subscribing...");
+                info!("MQTT connected — subscribing to {}", cfg.mqtt_topic);
                 if let Err(e) = client.subscribe(&cfg.mqtt_topic, QoS::AtLeastOnce).await {
-                    error!("Re-subscription failed: {e}");
+                    error!("Subscription failed: {e}");
                 }
             }
+
             Ok(Event::Incoming(Packet::Publish(publish))) => {
-                let topic = publish.topic.clone();
-                let payload = publish.payload.to_vec();
+                let permit = Arc::clone(&semaphore).acquire_owned().await.unwrap();
                 let producer = producer.clone();
                 let seq = seq.clone();
+                let topic = publish.topic.clone();
+                let payload = publish.payload.to_vec();
 
                 tokio::spawn(async move {
                     ingestion::process_payload(topic, payload, producer, seq).await;
+                    drop(permit);
                 });
             }
+
+            Ok(Event::Incoming(Packet::SubAck(ack))) => {
+                info!("Subscribed — SubAck pkid={}", ack.pkid);
+            }
+
+            Ok(Event::Incoming(Packet::PingResp)) => {
+                log::trace!("PingResp received — keep-alive healthy");
+            }
+
             Ok(_) => {}
+
+            // ✅ No sleep — poll immediately to let rumqttc drive reconnect
             Err(e) => {
                 error!("MQTT connection error: {e}");
-                tokio::time::sleep(Duration::from_secs(10)).await;
-                // No need to 'continue' if you rely on eventloop.poll()
-                // to handle the reconnection attempt automatically.
             }
         }
     }
