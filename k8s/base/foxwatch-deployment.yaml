@@ -14,13 +14,17 @@ spec:
       labels:
         app: foxwatch
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: foxwatch
-          image: foxwatch:latest
-          imagePullPolicy: Always        # image is built locally on the node
+          # CI overwrites this field via `kubectl set image` on every deploy.
+          # This value is just a valid placeholder for `kubectl apply`.
+          image: ghcr.io/glasserp/foxwatch:staging
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
-                name: foxwatch-config   # all env vars from the ConfigMap
+                name: foxwatch-config
           resources:
             requests:
               memory: "32Mi"
@@ -28,9 +32,6 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "200m"
-          # Liveness: if this fails k8s restarts the pod
-          # We'll add a real HTTP health endpoint soon —
-          # for now we just check the process is alive
           livenessProbe:
             exec:
               command: ["pgrep", "foxwatch"]
