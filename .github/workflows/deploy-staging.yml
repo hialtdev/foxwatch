@@ -54,6 +54,15 @@ jobs:
           echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
+      - name: Debug kubeconfig
+        run: |
+          echo "--- file size ---"
+          ls -la ~/.kube/config
+          echo "--- server line ---"
+          grep server ~/.kube/config || echo "NO SERVER LINE FOUND"
+          echo "--- first 5 lines ---"
+          head -5 ~/.kube/config
+
       - name: Ensure staging namespace exists
         run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
 
