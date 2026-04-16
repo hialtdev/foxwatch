@@ -1,10 +1,8 @@
 name: Deploy → Staging
 
 on:
-  workflow_run:
-    workflows: [ "CI" ]
+  push:
     branches: [ dev ]
-    types: [ completed ]
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
