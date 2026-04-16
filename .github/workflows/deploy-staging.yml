@@ -23,10 +23,15 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         run: |
@@ -38,11 +43,19 @@ jobs:
           docker push "${{ env.IMAGE }}:${SHA}"
           docker push "${{ env.IMAGE }}:staging"
 
-      - name: Configure kubectl
+      # ── Deploy ─────────────────────────────────────────────────────────────
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
           chmod 600 ~/.kube/config
+
+      - name: Ensure staging namespace exists
+        run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to staging
         run: |
@@ -50,13 +63,15 @@ jobs:
           kubectl set image deployment/foxwatch \
             foxwatch="${{ env.IMAGE }}:${SHA}" \
             --namespace staging
+
+      - name: Wait for rollout
+        run: |
           kubectl rollout status deployment/foxwatch \
             --namespace staging \
-            --timeout=120s
+            --timeout=180s
 
       - name: Smoke check
         if: always()
         run: |
           kubectl get pods -n staging -l app=foxwatch
           kubectl logs -n staging deployment/foxwatch --tail=30
-          

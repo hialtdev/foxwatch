@@ -16,24 +16,31 @@ jobs:
       packages: write
 
     steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
       - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Promote image to :production tag
         run: |
           SHA="${{ github.sha }}"
-          # Pull the exact image staging validated — no Rust compile, no Docker build
           docker pull "${{ env.IMAGE }}:${SHA}"
           docker tag  "${{ env.IMAGE }}:${SHA}" "${{ env.IMAGE }}:production"
           docker push "${{ env.IMAGE }}:production"
 
-      - name: Configure kubectl
+      - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
           chmod 600 ~/.kube/config
+
+      - name: Ensure production namespace exists
+        run: kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to production
         run: |
@@ -41,9 +48,12 @@ jobs:
           kubectl set image deployment/foxwatch \
             foxwatch="${{ env.IMAGE }}:${SHA}" \
             --namespace production
+
+      - name: Wait for rollout
+        run: |
           kubectl rollout status deployment/foxwatch \
             --namespace production \
-            --timeout=120s
+            --timeout=180s
 
       - name: Smoke check
         if: always()
