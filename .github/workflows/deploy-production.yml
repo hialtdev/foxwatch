@@ -11,6 +11,9 @@ jobs:
   deploy:
     name: Promote SHA → Production
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Log in to GHCR

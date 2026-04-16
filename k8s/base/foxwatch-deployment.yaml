@@ -14,8 +14,6 @@ spec:
       labels:
         app: foxwatch
     spec:
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: foxwatch
           # CI overwrites this field via `kubectl set image` on every deploy.
