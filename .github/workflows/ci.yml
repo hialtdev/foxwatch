@@ -1,10 +1,10 @@
-name: Rust CI
+name: CI
 
 on:
   push:
-    branches: [ "**" ]  # all branches
+    branches: [ "**" ]
   pull_request:
-    branches: [ main, staging ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,25 +20,21 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev pkg-config
+          sudo apt-get install -y libssl-dev libcurl4-openssl-dev pkg-config
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      # Caches ~/.cargo/registry and target/ — cuts run time from ~3min to ~30sec
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting (rustfmt)
+      - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Lint (clippy)
+      - name: Lint
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Build
-        run: cargo build --verbose
 
       - name: Test
         run: cargo test --verbose

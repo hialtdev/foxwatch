@@ -1,48 +1,49 @@
-name: Production Deploy
+name: Deploy → Production
 
 on:
   push:
     branches: [ main ]
 
 env:
-  CARGO_TERM_COLOR: always
+  IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
-  build:
-    name: Test · Build · Docker (production)
+  deploy:
+    name: Promote SHA → Production
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
+      - name: Log in to GHCR
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake make gcc g++ libssl-dev libcurl4-openssl-dev pkg-config
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - name: Promote image to :production tag
+        run: |
+          SHA="${{ github.sha }}"
+          # Pull the exact image staging validated — no Rust compile, no Docker build
+          docker pull "${{ env.IMAGE }}:${SHA}"
+          docker tag  "${{ env.IMAGE }}:${SHA}" "${{ env.IMAGE }}:production"
+          docker push "${{ env.IMAGE }}:production"
 
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
 
-      - name: Check formatting (rustfmt)
-        run: cargo fmt --all -- --check
+      - name: Deploy to production
+        run: |
+          SHA="${{ github.sha }}"
+          kubectl set image deployment/foxwatch \
+            foxwatch="${{ env.IMAGE }}:${SHA}" \
+            --namespace production
+          kubectl rollout status deployment/foxwatch \
+            --namespace production \
+            --timeout=120s
 
-      - name: Lint (clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Test (release mode)
-        run: cargo test --release --verbose
-
-      - name: Build Docker image (production)
-        run: docker build -t foxwatch:latest .
-
-      # Uncomment when registry is configured
-      # - name: Push to registry
-      #   run: |
-      #     echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ghcr.io -u hialtdev --password-stdin
-      #     docker tag foxwatch:latest ghcr.io/hialtdev/foxwatch:latest
-      #     docker push ghcr.io/hialtdev/foxwatch:latest
+      - name: Smoke check
+        if: always()
+        run: |
+          kubectl get pods -n production -l app=foxwatch
+          kubectl logs -n production deployment/foxwatch --tail=30

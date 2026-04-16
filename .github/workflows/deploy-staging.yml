@@ -1,60 +1,39 @@
-# .github/workflows/staging.yml
-name: Staging Deploy
+name: Deploy → Staging
 
 on:
-  push:
-    branches: [ staging ]
+  workflow_run:
+    workflows: [ "CI" ]
+    branches: [ dev ]
+    types: [ completed ]
 
 env:
-  CARGO_TERM_COLOR: always
-  REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
-  build:
-    name: Test · Build · Deploy (staging)
+  deploy:
+    name: Build · Push · Deploy (staging)
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake make gcc g++ libssl-dev libcurl4-openssl-dev pkg-config
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting (rustfmt)
-        run: cargo fmt --all -- --check
-
-      - name: Lint (clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Test
-        run: cargo test --verbose
-
-      # ── Docker ──────────────────────────────────────────────────────────────
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build and push
         run: |
-          SHA_TAG="${{ env.IMAGE }}:${{ github.sha }}"
-          STAGING_TAG="${{ env.IMAGE }}:staging"
-
-          docker build -t "$SHA_TAG" -t "$STAGING_TAG" .
-          docker push "$SHA_TAG"
-          docker push "$STAGING_TAG"
-
-      # ── Deploy ──────────────────────────────────────────────────────────────
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          docker build \
+            -t "${{ env.IMAGE }}:${SHA}" \
+            -t "${{ env.IMAGE }}:staging" \
+            .
+          docker push "${{ env.IMAGE }}:${SHA}"
+          docker push "${{ env.IMAGE }}:staging"
 
       - name: Configure kubectl
         run: |
@@ -62,21 +41,18 @@ jobs:
           echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Patch image and roll out
+      - name: Deploy to staging
         run: |
-          SHA_TAG="${{ env.IMAGE }}:${{ github.sha }}"
-
-          # Patching to the SHA tag guarantees K3s sees a new image string
-          # every run — it has never cached this exact tag, so it must pull.
+          SHA="${{ github.event.workflow_run.head_sha }}"
           kubectl set image deployment/foxwatch \
-            foxwatch="$SHA_TAG" \
+            foxwatch="${{ env.IMAGE }}:${SHA}" \
             --namespace staging
-
           kubectl rollout status deployment/foxwatch \
             --namespace staging \
             --timeout=120s
 
-      - name: Smoke-check pod is running
+      - name: Smoke check
+        if: always()
         run: |
           kubectl get pods -n staging -l app=foxwatch
-          kubectl logs -n staging deployment/foxwatch --tail=20
+          kubectl logs -n staging deployment/foxwatch --tail=30
