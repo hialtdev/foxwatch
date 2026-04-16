@@ -55,6 +55,7 @@ jobs:
           mkdir -p ~/.kube
           printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
           chmod 600 ~/.kube/config
+          wc -c ~/.kube/config
 
       - name: Debug kubeconfig
         run: |
