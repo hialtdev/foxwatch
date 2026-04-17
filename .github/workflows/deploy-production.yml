@@ -44,13 +44,10 @@ jobs:
         uses: azure/setup-kubectl@v3
 
       - name: Configure kubeconfig
-        env:
-          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
+          echo "${{ secrets.KUBECONFIG_CI }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
 
       - name: Ensure production namespace exists
         run: kubectl --kubeconfig=$KUBECONFIG create namespace production --dry-run=client -o yaml | kubectl --kubeconfig=$KUBECONFIG apply -f -
