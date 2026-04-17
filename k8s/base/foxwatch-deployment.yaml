@@ -1,9 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: foxwatch
-  labels:
-    app: foxwatch
+  name: foxwatch-deployment
 spec:
   replicas: 1
   selector:

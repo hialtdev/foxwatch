@@ -5,7 +5,7 @@ on:
     branches: [dev]
 
 env:
-  registry: ${{ env.REGISTRY }}
+  REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           docker push "${{ env.IMAGE }}:${SHA}"
           docker push "${{ env.IMAGE }}:staging"
 
-  deploy:
+  deploy-staging:
     name: Deploy to Staging
     needs: build
     runs-on: ubuntu-latest
