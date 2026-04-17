@@ -51,14 +51,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
           chmod 600 ~/.kube/config
-
-      - name: Debug kubeconfig
-        run: |
-          echo "=== kubeconfig first 20 lines ==="
-          sed -n '1,20p' ~/.kube/config
-      
-          echo "=== kubectl config view ==="
-          kubectl config view
+    
 
       - name: Ensure staging namespace exists
         run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
