@@ -56,13 +56,10 @@ jobs:
 
       - name: Deploy to staging
         run: |
-          SHA="${{ github.sha }}"
-          kubectl --kubeconfig=$KUBECONFIG set image deployment/foxwatch \
-            foxwatch="${{ env.IMAGE }}:${SHA}" \
-            --namespace staging
+          cd k8s/staging         
+          kubectl apply -k .          
+          kubectl rollout restart deployment/foxwatch -n staging
 
       - name: Wait for rollout
         run: |
-          kubectl --kubeconfig=$KUBECONFIG rollout status deployment/foxwatch \
-            --namespace staging \
-            --timeout=180s
+          kubectl rollout status deployment/foxwatch -n staging --timeout=180s
