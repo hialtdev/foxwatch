@@ -8,15 +8,12 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
-  deploy:
-    name: Build · Push · Deploy (staging)
+  build:
+    name: Build & Push
     runs-on: ubuntu-latest
-    environment:
-      name: staging
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +31,15 @@ jobs:
           docker push "${{ env.IMAGE }}:${SHA}"
           docker push "${{ env.IMAGE }}:staging"
 
+  deploy:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
 
@@ -45,17 +51,6 @@ jobs:
           printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
           chmod 600 ~/.kube/config
           echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
-
-      - name: Debug Connection
-        run: |
-          kubectl --kubeconfig=$KUBECONFIG config current-context
-          kubectl --kubeconfig=$KUBECONFIG get nodes
-
-      - name: Ensure staging namespace exists
-        run: kubectl --kubeconfig=$KUBECONFIG create namespace staging --dry-run=client -o yaml | kubectl --kubeconfig=$KUBECONFIG apply -f -
-
-      - name: Apply Kustomize (staging)
-        run: kubectl --kubeconfig=$KUBECONFIG apply -k k8s/staging
 
       - name: Deploy to staging
         run: |
@@ -69,9 +64,3 @@ jobs:
           kubectl --kubeconfig=$KUBECONFIG rollout status deployment/foxwatch \
             --namespace staging \
             --timeout=180s
-
-      - name: Smoke check
-        if: always()
-        run: |
-          kubectl --kubeconfig=$KUBECONFIG get pods -n staging -l app=foxwatch
-          kubectl --kubeconfig=$KUBECONFIG logs -n staging deployment/foxwatch --tail=30
