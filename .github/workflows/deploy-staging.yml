@@ -71,6 +71,7 @@ jobs:
       - name: Ensure staging namespace exists
         run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
 
+
       - name: Deploy to staging
         run: |
           SHA="${{ github.sha }}"
