@@ -56,8 +56,9 @@ jobs:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          printf "%b" "$KUBECONFIG_DATA" > ~/.kube/config
+          echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
+      
 
       - name: Debug kubeconfig
         run: |
