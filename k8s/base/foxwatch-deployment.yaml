@@ -35,6 +35,8 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: build
+    environment:
+      name: staging
     steps:
       - uses: actions/checkout@v4
 
