@@ -2,9 +2,10 @@ name: Deploy → Staging
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev]
 
 env:
+  registry: ${{ env.REGISTRY }}
   IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
 
 jobs:
@@ -20,7 +21,7 @@ jobs:
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -37,8 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo (for k8s manifests)
+        uses: actions/checkout@v4
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -48,8 +51,11 @@ jobs:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          printf "%s" "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
+          # We write the raw base64 string to a temp file, then decode it
+          echo "$KUBECONFIG_DATA" > config.b64
+          base64 -d config.b64 > ~/.kube/config
           chmod 600 ~/.kube/config
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
 
       - name: Debug kubeconfig
         run: |
@@ -58,7 +64,9 @@ jobs:
       
           echo "=== kubectl config view ==="
           kubectl config view
-    
+
+      - name: Ensure staging namespace exists
+        run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to staging
         run: |
