@@ -18,7 +18,7 @@ spec:
         - name: foxwatch
           # CI overwrites this field via `kubectl set image` on every deploy.
           # This value is just a valid placeholder for `kubectl apply`.
-          image: ghcr.io/glasserp/foxwatch:staging
+          image: ghcr.io/hialtdev/foxwatch:staging
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
