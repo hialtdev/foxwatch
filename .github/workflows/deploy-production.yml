@@ -55,16 +55,12 @@ jobs:
       - name: Ensure production namespace exists
         run: kubectl --kubeconfig=$KUBECONFIG create namespace production --dry-run=client -o yaml | kubectl --kubeconfig=$KUBECONFIG apply -f -
 
-      - name: Deploy to production
+      - name: Deploy to Production
         run: |
-          # Assuming you have k8s/production manifests
-          kubectl --kubeconfig=$KUBECONFIG apply -k k8s/production
-          kubectl --kubeconfig=$KUBECONFIG set image deployment/foxwatch \
-            foxwatch="${{ env.IMAGE }}:latest" \
-            --namespace production
+          cd k8s/production         
+          kubectl apply -k .          
+          kubectl rollout restart deployment/foxwatch-deployment -n production
 
       - name: Wait for rollout
         run: |
-          kubectl --kubeconfig=$KUBECONFIG rollout status deployment/foxwatch \
-            --namespace production \
-            --timeout=180s
+          kubectl rollout status deployment/foxwatch-deployment -n production --timeout=180s
