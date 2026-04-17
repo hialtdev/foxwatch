@@ -58,15 +58,20 @@ jobs:
           mkdir -p ~/.kube
           printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
           chmod 600 ~/.kube/config
-          wc -c ~/.kube/config
           echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
-
-      - name: Debug kubeconfig
-        run: |
-          echo "KUBECONFIG env: $KUBECONFIG"
-          ls -la ~/.kube/config
-          grep server ~/.kube/config || echo "NO SERVER LINE FOUND"
-          head -5 ~/.kube/config
+          
+          # --- DEBUG STEP RESTORED & ENHANCED ---
+          echo "Checking file existence:"
+          ls -l ~/.kube/config
+          
+          echo "Checking file content (first 5 lines):"
+          head -n 5 ~/.kube/config
+          
+          echo "Verifying kubectl sees the config:"
+          kubectl config view
+          
+          echo "Testing connection:"
+          kubectl get nodes --kubeconfig=$HOME/.kube/config
 
       - name: Ensure staging namespace exists
         run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
