@@ -1,67 +1,37 @@
-name: Deploy → Staging
-
-on:
-  push:
-    branches: [ dev ]
-
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/foxwatch
-
-jobs:
-  build:
-    name: Build & Push
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        run: |
-          SHA="${{ github.sha }}"
-          docker build -t "${{ env.IMAGE }}:${SHA}" -t "${{ env.IMAGE }}:staging" .
-          docker push "${{ env.IMAGE }}:${SHA}"
-          docker push "${{ env.IMAGE }}:staging"
-
-  deploy:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: staging
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
-
-      - name: Ensure staging namespace exists
-        run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Deploy to staging
-        run: |
-          # Patching to ensure the image uses the current SHA
-          # (Ensure your kustomize/deployment files have the correct imagePullPolicy: Always)
-          kubectl set image deployment/foxwatch \
-            foxwatch="${{ env.IMAGE }}:${{ github.sha }}" \
-            --namespace staging
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/foxwatch \
-            --namespace staging \
-            --timeout=180s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foxwatch
+  labels:
+    app: foxwatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foxwatch
+  template:
+    metadata:
+      labels:
+        app: foxwatch
+    spec:
+      containers:
+        - name: foxwatch
+          # CI overwrites this field via `kubectl set image` on every deploy.
+          # This value is just a valid placeholder for `kubectl apply`.
+          image: ghcr.io/glasserp/foxwatch:staging
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: foxwatch-config
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            exec:
+              command: ["pgrep", "foxwatch"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
