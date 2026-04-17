@@ -11,6 +11,8 @@ jobs:
   deploy:
     name: Promote SHA → Production
     runs-on: ubuntu-latest
+    environment:
+      name: production
     permissions:
       contents: read
       packages: write
