@@ -47,15 +47,10 @@ jobs:
         uses: azure/setup-kubectl@v3
 
       - name: Configure kubeconfig
-        env:
-          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          # We write the raw base64 string to a temp file, then decode it
-          echo "$KUBECONFIG_DATA" > config.b64
-          base64 -d config.b64 > ~/.kube/config
+          echo "${{ secrets.KUBECONFIG_CI }}" > ~/.kube/config
           chmod 600 ~/.kube/config
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
 
       - name: Debug kubeconfig
         run: |
