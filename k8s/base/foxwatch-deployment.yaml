@@ -1,9 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: foxwatch
-  labels:
-    app: foxwatch
+  name: foxwatch-deployment
 spec:
   replicas: 1
   selector:
@@ -14,13 +12,11 @@ spec:
       labels:
         app: foxwatch
     spec:
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: foxwatch
           # CI overwrites this field via `kubectl set image` on every deploy.
           # This value is just a valid placeholder for `kubectl apply`.
-          image: ghcr.io/glasserp/foxwatch:staging
+          image: ghcr.io/hialtdev/foxwatch:staging
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
