@@ -56,25 +56,26 @@ jobs:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
+          printf "%b" "$KUBECONFIG_DATA" > ~/.kube/config
           chmod 600 ~/.kube/config
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
-          
-          # --- DEBUG STEP RESTORED & ENHANCED ---
-          echo "Checking file existence:"
-          ls -l ~/.kube/config
-          
-          echo "Checking file content (first 5 lines):"
-          head -n 5 ~/.kube/config
-          
-          echo "Verifying kubectl sees the config:"
+
+      - name: Debug kubeconfig
+        run: |
+          echo "=== kubeconfig first 20 lines ==="
+          sed -n '1,20p' ~/.kube/config
+      
+          echo "=== kubectl config view ==="
           kubectl config view
-          
-          echo "Testing connection:"
-          kubectl get nodes --kubeconfig=$HOME/.kube/config
+      
+          echo "=== test cluster connection ==="
+          kubectl get nodes
+
 
       - name: Ensure staging namespace exists
         run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Kustomize (staging)
+        run: kubectl apply -k k8s/staging
 
 
       - name: Deploy to staging
