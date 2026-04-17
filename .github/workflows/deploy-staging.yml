@@ -48,7 +48,9 @@ jobs:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_CI }}
         run: |
           mkdir -p ~/.kube
-          printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config
+          # We write the raw base64 string to a temp file, then decode it
+          echo "$KUBECONFIG_DATA" > config.b64
+          base64 -d config.b64 > ~/.kube/config
           chmod 600 ~/.kube/config
           echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
 
