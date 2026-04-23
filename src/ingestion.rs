@@ -49,36 +49,37 @@ pub async fn process_payload(
 }
 
 pub fn extract_device_id(topic: &str) -> Option<String> {
-    // .filter(|s| !s.is_empty()) handles leading/trailing/double slashes
+    // filter(|s| !s.is_empty()) handles leading/trailing/double slashes
     let parts: Vec<&str> = topic.split('/').filter(|s| !s.is_empty()).collect();
-
     match parts.as_slice() {
-        // Case 1: The "Deep" or "Standard" HA topic
-        // Pattern: [prefix, type, id, ...everything else]
-        // Example: "homeassistant/binary_sensor/motion_sensor/state" -> "motion_sensor"
-        [prefix, _type, id, ..] if *prefix == "homeassistant" => Some(id.to_string()),
+        // ha/lights/family_room_giraffe/state  → "family_room_giraffe"
+        // ha/vesync/perry_air/state            → "perry_air"
+        // ha/floodcam/rear/state               → "rear"
+        // ha/switches/bedroom_socket_1/state   → "bedroom_socket_1"
+        [_prefix, _type, id, ..] => Some(id.to_string()),
 
-        // Case 2: The "Short" topic
-        // Example: "homeassistant/status" -> "status"
-        [prefix, id] if *prefix == "homeassistant" => Some(id.to_string()),
+        // ha/lights or ha/status — not enough segments
+        [_prefix, _type] => None,
 
+        // single segment or empty
         _ => None,
     }
 }
 
 pub fn parse_ha_state(raw: &str) -> DeviceState {
-    match raw.trim() {
+    match raw.trim().to_uppercase().as_str() {
         "ON" => return DeviceState::On,
         "OFF" => return DeviceState::Off,
-        "unavailable" => return DeviceState::Unavailable,
+        "UNAVAILABLE" => return DeviceState::Unavailable,
         _ => {}
     }
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
         if let Some(s) = v.get("state").and_then(|s| s.as_str()) {
-            return match s {
-                "ON" => DeviceState::On,
-                "OFF" => DeviceState::Off,
-                other => DeviceState::Unknown(other.to_string()),
+            return match s.to_uppercase().as_str() {
+                "ON"          => DeviceState::On,
+                "OFF"         => DeviceState::Off,
+                "UNAVAILABLE" => DeviceState::Unavailable,
+                other         => DeviceState::Unknown(other.to_string()),
             };
         }
     }
