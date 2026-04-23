@@ -63,7 +63,7 @@ impl<'de> Deserialize<'de> for HaColor {
 
         // Extract each element — default to 0 if missing or null
         let r = arr
-            .get(0)
+            .first()
             .and_then(|v| v.as_f64())
             .map(|f| f as u8)
             .unwrap_or(0);
