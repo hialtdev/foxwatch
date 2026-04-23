@@ -66,7 +66,7 @@ pub fn extract_device_id(topic: &str) -> Option<String> {
     }
 }
 
-fn parse_ha_state(raw: &str) -> DeviceState {
+pub fn parse_ha_state(raw: &str) -> DeviceState {
     match raw.trim() {
         "ON" => return DeviceState::On,
         "OFF" => return DeviceState::Off,
