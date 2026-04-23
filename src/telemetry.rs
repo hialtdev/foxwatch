@@ -20,28 +20,42 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct HaPayload {
-    // Common to most devices
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
 
-    // Light-specific fields
-    pub brightness: Option<f64>, // 0-255, f64 because HA sometimes sends 255.0
-    pub color: Option<HaColor>,  // RGB array [r, g, b]
-    pub color_temp: Option<f64>, // Mired color temperature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brightness: Option<f64>,
 
-    // Floodcam-specific fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<HaColor>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_temp: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub floodlight: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub recording: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub flip: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub watermark: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub night_vision: Option<String>,
 
-    // VeSync air purifier — these come as separate topics not fields,
-    // but we model them here for completeness when they do appear as JSON
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<f64>,
 }
-
 // HA publishes color as a JSON array: [255, 107, 91]
 // We deserialize it as a struct with r/g/b fields for clarity in Seq/Kafka.
 #[derive(Debug, Clone)]
