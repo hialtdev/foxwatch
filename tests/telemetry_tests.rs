@@ -280,3 +280,17 @@ fn switch_message_has_no_color() {
 
     assert!(json["payload"]["color"].is_null());
 }
+#[test]
+fn floodcam_message_has_no_state() {
+    let msg = TelemetryMessage::new(
+        "ha/floodcam/rear/state".to_string(),
+        "rear".to_string(),
+        DeviceState::Unknown("floodlight:on".to_string()),
+        Some(floodcam_payload()),
+        r#"{"floodlight":"on","recording":"on","flip":"off","watermark":"on"}"#.to_string(),
+    );
+    let bytes = msg.serialize().unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(json["payload"]["state"].is_null());
+    assert_eq!(json["payload"]["floodlight"], "on");
+}
