@@ -90,7 +90,10 @@ fn test_parse_lowercase_off() {
 
 #[test]
 fn test_parse_unavailable() {
-    assert!(matches!(parse_ha_state("unavailable"), DeviceState::Unavailable));
+    assert!(matches!(
+        parse_ha_state("unavailable"),
+        DeviceState::Unavailable
+    ));
 }
 
 #[test]

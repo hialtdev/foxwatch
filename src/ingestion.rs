@@ -76,10 +76,10 @@ pub fn parse_ha_state(raw: &str) -> DeviceState {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
         if let Some(s) = v.get("state").and_then(|s| s.as_str()) {
             return match s.to_uppercase().as_str() {
-                "ON"          => DeviceState::On,
-                "OFF"         => DeviceState::Off,
+                "ON" => DeviceState::On,
+                "OFF" => DeviceState::Off,
                 "UNAVAILABLE" => DeviceState::Unavailable,
-                other         => DeviceState::Unknown(other.to_string()),
+                other => DeviceState::Unknown(other.to_string()),
             };
         }
     }
