@@ -5,8 +5,9 @@ metadata:
 data:
   MQTT_HOST:         "10.99.1.199"
   MQTT_PORT:         "1883"
-  MQTT_TOPIC:        "homeassistant/#"
+  MQTT_TOPIC:        "ha/#"
   MQTT_CLIENT_ID:    "foxwatch"
   KAFKA_BOOTSTRAP:   "bitbybit-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
   KAFKA_TOPIC:       "foxwatch-telemetry"
+  SEQ_URL:           "http://seq-service.default.svc.cluster.local:5341"
   RUST_LOG:          "info"
