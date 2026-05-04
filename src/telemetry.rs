@@ -114,6 +114,7 @@ impl Serialize for HaColor {
 
 // ── DeviceState ──────────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged, rename_all = "lowercase")] // Untagged removes the "Unknown" key; lowercase fixes "On" -> "on"
 pub enum DeviceState {
     On,
     Off,
