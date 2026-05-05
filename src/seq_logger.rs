@@ -56,7 +56,7 @@ impl ClefEvent {
 
 /// Messages sent to the background shipper task
 enum ShipperMessage {
-    Event(ClefEvent),
+    Event(Box<ClefEvent>),
     /// Notify the shipper that a device just went unavailable
     /// The shipper tracks these and fires a WAP dropout alert
     /// if multiple devices drop within the window
@@ -83,7 +83,7 @@ impl SeqLogger {
             let mut recent_unavailable: Vec<(String, std::time::Instant)> = Vec::new();
 
             // Known WAP device groups — add more as you map your network
-            let greyhound_down_devices = vec![
+            let greyhound_down_devices = [
                 "family_room_froggy".to_string(),
                 "family_room_giraffe".to_string(),
                 "family_room_greenie".to_string(),
@@ -174,7 +174,7 @@ impl SeqLogger {
 
     pub fn info(&self, template: &str) {
         let event = ClefEvent::new("Information", template);
-        let _ = self.sender.try_send(ShipperMessage::Event(event));
+        let _ = self.sender.try_send(ShipperMessage::Event(Box::from(event)));
     }
 
     pub fn telemetry_received(&self, topic: &str, device_id: &str, message_id: &str) {
@@ -185,7 +185,7 @@ impl SeqLogger {
         event.topic      = Some(topic.to_string());
         event.device_id  = Some(device_id.to_string());
         event.message_id = Some(message_id.to_string());
-        let _ = self.sender.try_send(ShipperMessage::Event(event));
+        let _ = self.sender.try_send(ShipperMessage::Event(Box::from(event)));
     }
 
     pub fn kafka_delivered(&self, device_id: &str, partition: i32, offset: i64) {
@@ -196,7 +196,7 @@ impl SeqLogger {
         event.device_id      = Some(device_id.to_string());
         event.kafka_partition = Some(partition);
         event.kafka_offset    = Some(offset);
-        let _ = self.sender.try_send(ShipperMessage::Event(event));
+        let _ = self.sender.try_send(ShipperMessage::Event(Box::from(event)));
     }
 
     /// Call when a device transitions to Unavailable state.
@@ -210,6 +210,6 @@ impl SeqLogger {
 
     pub fn error(&self, template: &str) {
         let event = ClefEvent::new("Error", template);
-        let _ = self.sender.try_send(ShipperMessage::Event(event));
+        let _ = self.sender.try_send(ShipperMessage::Event(Box::from(event)));
     }
 }

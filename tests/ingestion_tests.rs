@@ -141,10 +141,51 @@ fn test_parse_floodcam_no_state_key() {
     let raw = r#"{"floodlight":"on","brightness":255,"recording":"on","flip":"off"}"#;
     assert!(matches!(parse_ha_state(raw), DeviceState::Unknown(_)));
 }
+#[test]
+fn test_parse_json_with_state_key() {
+    // This mimics the library light payload you found in Kafka
+    let json_input = r#"{"state": "off", "brightness": null, "color": null}"#;
+    assert!(matches!(parse_ha_state(json_input), DeviceState::Off));
+}
 
+#[test]
+fn test_parse_json_unavailable_blip() {
+    // This mimics the transient dropout you caught earlier
+    let json_input = r#"{"state": "unavailable", "brightness": null}"#;
+    assert!(matches!(parse_ha_state(json_input), DeviceState::Unavailable));
+}
 #[test]
 fn test_parse_switch_off() {
     // ha/switches/bedroom_socket_1/state
     let raw = r#"{"state":"OFF"}"#;
     assert!(matches!(parse_ha_state(raw), DeviceState::Off));
+}
+
+#[test]
+fn floodcam_all_unavailable_fields_detected() {
+    let raw = r#"{"floodlight":"unavailable","recording":"unavailable","flip":"unavailable","watermark":"unavailable","night_vision":"unavailable"}"#;
+    assert!(matches!(
+        parse_ha_state(raw),
+        DeviceState::Unavailable
+    ));
+}
+
+#[test]
+fn floodcam_mixed_fields_not_unavailable() {
+    let raw = r#"{"floodlight":"off","recording":"on","flip":"off"}"#;
+    assert!(matches!(
+        parse_ha_state(raw),
+        DeviceState::Unknown(_)
+    ));
+}
+
+#[test]
+fn test_parse_long_unknown_json_falls_back_to_complex() {
+    // A long JSON string that has NO "state" key and NOT all "unavailable" values
+    let raw = r#"{"metadata": "some_very_long_string_that_exceeds_twenty_characters", "id": 12345}"#;
+    if let DeviceState::Unknown(s) = parse_ha_state(raw) {
+        assert_eq!(s, "complex_payload");
+    } else {
+        panic!("Should have been Unknown variant");
+    }
 }

@@ -81,31 +81,40 @@ pub fn extract_device_id(topic: &str) -> Option<String> {
 }
 
 pub fn parse_ha_state(input: &str) -> DeviceState {
-    // 1. Check if the input is a simple status string
-    match input.trim().to_uppercase().as_str() {
-        "ON"          => return DeviceState::On,
-        "OFF"         => return DeviceState::Off,
-        "UNAVAILABLE" => return DeviceState::Unavailable,
-        _             => {}
+    let trimmed = input.trim();
+
+    // 1. Direct match for simple strings (Fast Path)
+    match trimmed.to_lowercase().as_str() {
+        "on" => return DeviceState::On,
+        "off" => return DeviceState::Off,
+        "unavailable" => return DeviceState::Unavailable,
+        _ => {}
     }
 
-    // 2. If it's JSON, try to extract just the "state" field
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(input) {
+    // 2. JSON Extraction (The "Truth" Path)
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
         if let Some(s) = v.get("state").and_then(|s| s.as_str()) {
-            return match s.to_uppercase().as_str() {
-                "ON"          => DeviceState::On,
-                "OFF"         => DeviceState::Off,
-                "UNAVAILABLE" => DeviceState::Unavailable,
-                other         => DeviceState::Unknown(other.to_lowercase()), // Just the state string
+            return match s.to_lowercase().as_str() {
+                "on" => DeviceState::On,
+                "off" => DeviceState::Off,
+                "unavailable" => DeviceState::Unavailable,
+                other => DeviceState::Unknown(other.to_string()),
             };
+        }
+
+        // 3. All-Unavailable check (for your Floodcams)
+        if let Some(obj) = v.as_object() {
+            let string_values: Vec<&str> = obj.values().filter_map(|v| v.as_str()).collect();
+            if !string_values.is_empty() && string_values.iter().all(|s| s.eq_ignore_ascii_case("unavailable")) {
+                return DeviceState::Unavailable;
+            }
         }
     }
 
-    // 3. Fallback: If it's truly unknown, don't store the whole JSON blob.
-    // Store a placeholder or a truncated version.
-    if input.len() > 20 {
+    // 4. Fallback only if no "state" key was found
+    if trimmed.len() > 20 {
         DeviceState::Unknown("complex_payload".to_string())
     } else {
-        DeviceState::Unknown(input.to_string())
+        DeviceState::Unknown(trimmed.to_string())
     }
 }
