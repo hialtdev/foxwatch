@@ -118,7 +118,9 @@ Each closed window emits one row per device that had at least one unavailability
 The session cluster supports interactive Flink SQL via:
 
 ```bash
+kubectl get pods -n flink
 kubectl exec -it -n flink <jobmanager-pod> -- /opt/flink/bin/sql-client.sh
+kubectl exec -it -n flink foxwatch-session-cluster-5dd96b78dd-xgfnz -- /opt/flink/bin/sql-client.sh
 ```
 
 Useful queries:
