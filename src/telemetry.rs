@@ -114,6 +114,7 @@ impl Serialize for HaColor {
 
 // ── DeviceState ──────────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum DeviceState {
     On,
     Off,
@@ -150,6 +151,12 @@ pub struct TelemetryMessage {
     pub state: DeviceState,
     pub timestamp: DateTime<Utc>,
 
+    /// Availability is distinct from power state:
+    /// - `Off` can be a healthy/intentional state (automation turned it off)
+    /// - `Unavailable` indicates the device stopped reporting / is offline
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_available: Option<bool>,
+
     // Structured payload — Some() for JSON devices, None for plain string devices
     // (VeSync topics like ha/vesync/perry_air/filter send "76" not JSON)
     pub payload: Option<HaPayload>,
@@ -166,12 +173,14 @@ impl TelemetryMessage {
         payload: Option<HaPayload>,
         raw_payload: String,
     ) -> Self {
+        let is_available = Some(!matches!(state, DeviceState::Unavailable));
         Self {
             id: Uuid::new_v4(),
             topic,
             device_id,
             state,
             timestamp: Utc::now(),
+            is_available,
             payload,
             raw_payload,
         }
@@ -240,6 +249,7 @@ mod tests {
         assert!(!bytes.is_empty());
         let back: TelemetryMessage = serde_json::from_slice(&bytes).unwrap();
         assert!(!back.id.to_string().is_empty());
+        assert_eq!(back.is_available, Some(true));
     }
 
     #[test]
@@ -262,6 +272,39 @@ mod tests {
         assert_eq!(payload.state, Some("unavailable".to_string()));
         assert!(payload.brightness.is_none());
         assert!(payload.color.is_none());
+    }
+
+    #[test]
+    fn deserializes_legacy_message_without_is_available() {
+        // Backward compatibility: older Kafka messages won't have `is_available`.
+        let raw = r#"{
+            "id":"00000000-0000-0000-0000-000000000000",
+            "topic":"ha/switches/bedroom_socket_1/state",
+            "device_id":"bedroom_socket_1",
+            "state":"Off",
+            "timestamp":"2026-05-08T00:00:00Z",
+            "payload":{"state":"off"},
+            "raw_payload":"{\"state\":\"off\"}"
+        }"#;
+
+        let msg: TelemetryMessage = serde_json::from_str(raw).unwrap();
+        assert!(msg.is_available.is_none(), "legacy payload should deserialize as None");
+    }
+
+    #[test]
+    fn unavailable_is_not_available() {
+        let msg = TelemetryMessage::new(
+            "ha/switches/front_porch/state".to_string(),
+            "front_porch".to_string(),
+            DeviceState::Unavailable,
+            Some(HaPayload {
+                state: Some("unavailable".to_string()),
+                ..Default::default()
+            }),
+            r#"{"state":"unavailable"}"#.to_string(),
+        );
+
+        assert_eq!(msg.is_available, Some(false));
     }
 
     #[test]

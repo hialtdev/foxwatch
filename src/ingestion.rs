@@ -1,11 +1,6 @@
 // src/ingestion.rs
 // Receives owned data from main's event loop.
 // Parses → validates → logs → publishes to Kafka → ships to Seq.
-//
-// Serde flow:
-//   raw bytes → UTF-8 String → attempt HaPayload deserialization
-//   Success: structured payload with brightness, color, etc.
-//   Failure: plain string (e.g. "76", "sleep") → payload is None
 
 use crate::kafka_producer::KafkaProducer;
 use crate::seq_logger::SeqLogger;
@@ -18,8 +13,6 @@ pub async fn process_payload(
     producer: KafkaProducer,
     seq: SeqLogger,
 ) {
-    // Step 1 — raw bytes to UTF-8 string
-    // &payload is a borrow — we read the bytes without taking ownership
     let raw = match std::str::from_utf8(&payload) {
         Ok(s) => s.to_string(),
         Err(e) => {
@@ -29,51 +22,46 @@ pub async fn process_payload(
         }
     };
 
-    // Step 2 — attempt structured deserialization into HaPayload
-    // serde_json::from_str returns Result<HaPayload, Error>
-    // .ok() converts that to Option<HaPayload>:
-    //   Ok(payload)  → Some(payload)   (valid JSON matching our struct)
-    //   Err(_)       → None            (plain string like "76" or "sleep")
     let ha_payload: Option<HaPayload> = serde_json::from_str(&raw).ok();
 
-    // Step 3 — extract DeviceState
-    // If we have a structured payload, read state from it.
-    // Otherwise fall back to parsing the raw string directly.
     let state = match &ha_payload {
         Some(p) => match p.state.as_deref() {
-            // as_deref() converts Option<String> to Option<&str>
-            // so we can match on string slices without cloning
             Some(s) => parse_ha_state(s),
-            None => parse_ha_state(&raw),
+            None    => parse_ha_state(&raw),
         },
         None => parse_ha_state(&raw),
     };
 
-    // Step 4 — extract device_id from topic path
     let device_id = extract_device_id(&topic).unwrap_or_else(|| "unknown".to_string());
-
-    // Step 5 — construct the pipeline envelope
-    // TelemetryMessage::new now takes Option<HaPayload>
-    let message = TelemetryMessage::new(
+    let message   = TelemetryMessage::new(
         topic.clone(),
         device_id,
         state,
-        ha_payload, // moved in — Option<HaPayload>
-        raw,        // moved in — original string preserved for audit
+        ha_payload,
+        raw,
     );
 
-    // Step 6 — validate and route
     match message.validate() {
         Ok(()) => {
             info!(
                 "✓ [{id}] {topic} → {state:?} brightness={brightness:?}",
-                id = &message.id.to_string()[..8],
-                topic = message.topic,
-                state = message.state,
+                id         = &message.id.to_string()[..8],
+                topic      = message.topic,
+                state      = message.state,
                 brightness = message.payload.as_ref().and_then(|p| p.brightness),
             );
 
-            seq.telemetry_received(&message.topic, &message.device_id, &message.id.to_string());
+            // Fire WAP dropout detector for unavailable transitions
+            // before moving message into Kafka (publish consumes ownership)
+            if matches!(message.state, DeviceState::Unavailable) {
+                seq.device_unavailable(&message.device_id, &message.topic);
+            } else {
+                seq.telemetry_received(
+                    &message.topic,
+                    &message.device_id,
+                    &message.id.to_string(),
+                );
+            }
 
             producer.publish(message, seq).await;
         }
@@ -84,8 +72,6 @@ pub async fn process_payload(
     }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 pub fn extract_device_id(topic: &str) -> Option<String> {
     let parts: Vec<&str> = topic.split('/').filter(|s| !s.is_empty()).collect();
     match parts.as_slice() {
@@ -94,24 +80,41 @@ pub fn extract_device_id(topic: &str) -> Option<String> {
     }
 }
 
-pub fn parse_ha_state(raw: &str) -> DeviceState {
-    // Normalize to uppercase so "on", "ON", "On" all match
-    match raw.trim().to_uppercase().as_str() {
-        "ON" => return DeviceState::On,
-        "OFF" => return DeviceState::Off,
-        "UNAVAILABLE" => return DeviceState::Unavailable,
+pub fn parse_ha_state(input: &str) -> DeviceState {
+    let trimmed = input.trim();
+
+    // 1. Direct match for simple strings (Fast Path)
+    match trimmed.to_lowercase().as_str() {
+        "on" => return DeviceState::On,
+        "off" => return DeviceState::Off,
+        "unavailable" => return DeviceState::Unavailable,
         _ => {}
     }
-    // Try JSON — some devices send {"state":"ON",...}
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+
+    // 2. JSON Extraction (The "Truth" Path)
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
         if let Some(s) = v.get("state").and_then(|s| s.as_str()) {
-            return match s.to_uppercase().as_str() {
-                "ON" => DeviceState::On,
-                "OFF" => DeviceState::Off,
-                "UNAVAILABLE" => DeviceState::Unavailable,
+            return match s.to_lowercase().as_str() {
+                "on" => DeviceState::On,
+                "off" => DeviceState::Off,
+                "unavailable" => DeviceState::Unavailable,
                 other => DeviceState::Unknown(other.to_string()),
             };
         }
+
+        // 3. All-Unavailable check (for your Floodcams)
+        if let Some(obj) = v.as_object() {
+            let string_values: Vec<&str> = obj.values().filter_map(|v| v.as_str()).collect();
+            if !string_values.is_empty() && string_values.iter().all(|s| s.eq_ignore_ascii_case("unavailable")) {
+                return DeviceState::Unavailable;
+            }
+        }
     }
-    DeviceState::Unknown(raw.to_string())
+
+    // 4. Fallback only if no "state" key was found
+    if trimmed.len() > 20 {
+        DeviceState::Unknown("complex_payload".to_string())
+    } else {
+        DeviceState::Unknown(trimmed.to_string())
+    }
 }

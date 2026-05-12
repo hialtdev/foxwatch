@@ -16,17 +16,6 @@ The architecture mirrors production robotics and autonomous systems data pipelin
 
 ---
 
-## Portfolio
-
-| Project | Stack | Link |
-|---|---|---|
-| **foxwatch** | Rust · Tokio · Kafka · k3s | this repo |
-| **BitByBit** | Spring Boot · React/Vite · Kafka · MongoDB · k3s | [bitbybit.hialt.dev](https://bitbybit.hialt.dev) |
-
-BitByBit is a production-deployed full-stack application running on the same k3s cluster as foxwatch — Spring Boot backend, React/TypeScript frontend, Strimzi Kafka, MongoDB Atlas, structured logging to Seq, JWT/OAuth2 security, and Cloudflare tunnel ingress.
-
----
-
 ## Architecture
 
 ```
